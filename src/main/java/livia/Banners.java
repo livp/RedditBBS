@@ -76,6 +76,16 @@ public class Banners {
     return padded;
   }
 
+  static void errorMessage(Terminal terminal, String message) {
+    String fancyError = new AttributedStringBuilder()
+        .style(AttributedStyle.DEFAULT.foreground(AttributedStyle.RED))
+        .append(String.format("!!! ERROR !!!! %s", message))
+        .toAnsi();
+    terminal.writer().println(fancyError);
+    terminal.flush();
+  }
+
+
   // Prevent instantiation.
   private Banners() {}
 

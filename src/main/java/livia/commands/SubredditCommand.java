@@ -3,11 +3,13 @@ package livia.commands;
 import com.google.common.base.Strings;
 import livia.Banners;
 import livia.Model.Subreddit;
+import livia.commands.ListPosts.PostSort;
 import livia.singletons.TheTerminal;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.ParsedLine;
 import org.jline.reader.impl.DefaultParser;
+import org.jline.reader.impl.completer.StringsCompleter;
 import org.jline.utils.AttributedStringBuilder;
 import org.jline.utils.AttributedStyle;
 
@@ -35,6 +37,7 @@ public class SubredditCommand extends Command {
         LineReader reader = LineReaderBuilder.builder()
                 .terminal(TheTerminal.get())
                 .parser(new DefaultParser())
+                .completer(new StringsCompleter("HOT", "NEW", "TOP", "DAVERYBEST"))
                 .build();
         String line = reader.readLine(prompt());
         ParsedLine parsedLine = reader.getParser().parse(line, 0);
@@ -48,6 +51,8 @@ public class SubredditCommand extends Command {
             case "END":
                 end = true;
                 break;
+            case "HOT":
+                return Command.listPosts(subreddit, PostSort.HOT, this);
             default:
                 BUM("Valid commands: BACK, END");
         }

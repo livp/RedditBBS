@@ -6,7 +6,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import io.korhner.asciimg.image.AsciiImgCache;
 import io.korhner.asciimg.image.character_fit_strategy.ColorSquareErrorFitStrategy;
-import io.korhner.asciimg.image.character_fit_strategy.StructuralSimilarityFitStrategy;
 import io.korhner.asciimg.image.converter.AsciiToStringConverter;
 
 import javax.imageio.ImageIO;
@@ -16,6 +15,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class Model {
@@ -23,6 +23,7 @@ public class Model {
     public static class Listing {
 
         public Set<Subreddit> subreddits = new HashSet<>();
+        public List<Message> messages = new ArrayList<>();
         public String after = null;
 
         public static Listing fromJson(GenericJson json) {
@@ -40,12 +41,16 @@ public class Model {
 
         private static void parseChildren(Listing listing, ArrayList<ArrayMap> children) {
             children.forEach(child -> {
-                if (child.containsKey("kind")) {
-                    if (child.get("kind").equals("t5")) {
-                        ArrayMap data = (ArrayMap) child.get("data");
+                String kind = stringOrEmpty(child, "kind");
+              ArrayMap data = (ArrayMap) child.get("data");
+                    switch (kind){
+                      case "t5":
                         listing.subreddits.add(Subreddit.fromJson(data));
+                        break;
+                      case "t4":
+                        listing.messages.add(Message.fromJson(data));
+                        break;
                     }
-                }
             });
         }
 
@@ -92,6 +97,17 @@ public class Model {
             }
             return line.substring(0, length - 1);
         }
+    }
+
+    public static class Message {
+      public String title;
+
+      public static Message fromJson(ArrayMap json) {
+        Message message = new Message();
+
+        message.title = stringOrEmpty(json, "title");
+        return message;
+      }
     }
 
     static String stringOrEmpty(ArrayMap json, String key) {

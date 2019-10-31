@@ -22,4 +22,8 @@ public abstract class Command {
   public static Command subreddit(Subreddit subreddit) {
     return SubredditCommand.create(subreddit);
   }
+
+  public static Command listPosts(Subreddit subreddit, ListPosts.PostSort postSort, Command parent) {
+    return ListPosts.create(subreddit, postSort, parent);
+  }
 }

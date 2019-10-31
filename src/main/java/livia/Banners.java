@@ -1,9 +1,15 @@
 package livia;
 
+import livia.singletons.TheTerminal;
 import org.jline.terminal.Terminal;
 import org.jline.utils.AttributedString;
 import org.jline.utils.AttributedStringBuilder;
 import org.jline.utils.AttributedStyle;
+
+import static livia.Banners.ErrorType.*;
+import static livia.singletons.TheTerminal.flush;
+import static livia.singletons.TheTerminal.writer;
+import static org.jline.utils.AttributedStyle.*;
 
 public class Banners {
 
@@ -36,22 +42,22 @@ public class Banners {
   /**
    * Gets the nice little alien shown in the terminal.
    */
-  static void displayWelcomeBanner(Terminal terminal) {
+  public static void displayWelcomeBanner() {
     AttributedString welcome = new AttributedStringBuilder()
         .style(AttributedStyle.DEFAULT.bold())
-        .style(AttributedStyle.DEFAULT.foreground(AttributedStyle.RED))
-        .append(centerBanner(terminal, BIG_ALIEN))
+        .style(AttributedStyle.DEFAULT.foreground(RED))
+        .append(centerBanner(BIG_ALIEN))
         .style(AttributedStyle.DEFAULT.boldOff())
-        .append(centerBanner(terminal, WELCOME_LINE))
+        .append(centerBanner(WELCOME_LINE))
         .toAttributedString();
-    terminal.writer().println(welcome.toAnsi());
-    terminal.flush();
+    writer().println(welcome.toAnsi());
+    flush();
   }
 
   /**
    * Computes the effective width of a multi-line string.
    */
-  static int bannerWidth(String banner) {
+  public static int bannerWidth(String banner) {
     int bannerWidth = 0;
     for (String s : banner.split("\n")) {
       if (s.length() > bannerWidth) {
@@ -64,8 +70,8 @@ public class Banners {
   /**
    * Pads a banner with spaces to center it in the terminal.
    */
-  static String centerBanner(Terminal terminal, String banner) {
-    int pad = Math.floorDiv(terminal.getWidth() - bannerWidth(banner), 2);
+  public static String centerBanner(String banner) {
+    int pad = Math.floorDiv(TheTerminal.width() - bannerWidth(banner), 2);
     if (pad <= 0) {
       return banner;
     }
@@ -76,13 +82,47 @@ public class Banners {
     return padded;
   }
 
-  static void errorMessage(Terminal terminal, String message) {
+  public enum ErrorType {
+    BUM(AttributedStyle.DEFAULT.foreground(YELLOW)),
+    BIG_BADA_BUM(AttributedStyle.DEFAULT.foreground(BRIGHT | RED)),
+    OH_FUCK(AttributedStyle.DEFAULT.bold().blink().foreground(BRIGHT | RED));
+
+    private AttributedStyle style;
+
+    ErrorType(AttributedStyle style) {
+      this.style = style;
+    }
+
+    AttributedStyle getStyle() {
+      return style;
+    }
+  }
+
+  public static void errorMessage(ErrorType type, String message) {
+    errorMessage(TheTerminal.get(), type, message);
+  }
+
+  public static void BUM(String message) {
+    errorMessage(TheTerminal.get(), BUM, message);
+  }
+  public static void BIG_BADA_BUM(String message) {
+    errorMessage(TheTerminal.get(), BIG_BADA_BUM, message);
+  }
+  public static void OH_FUCK(String message) {
+    errorMessage(TheTerminal.get(), OH_FUCK, message);
+  }
+
+  public static void errorMessage(Terminal terminal, ErrorType type, String message) {
     String fancyError = new AttributedStringBuilder()
-        .style(AttributedStyle.DEFAULT.foreground(AttributedStyle.RED))
+        .style(type.getStyle())
         .append(String.format("!!! ERROR !!!! %s", message))
         .toAnsi();
     terminal.writer().println(fancyError);
     terminal.flush();
+    if (type.equals(ErrorType.OH_FUCK)) {
+      System.err.println("All is lost.");
+      System.exit(-1);
+    }
   }
 
 

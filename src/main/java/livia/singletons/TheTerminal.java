@@ -18,6 +18,12 @@ public abstract class TheTerminal {
 
     private static Terminal theOnlyOne = null;
 
+    public static void println(String s) {
+        get().writer().println(s);
+        get().flush();
+        return;
+    }
+
     public static Terminal get() {
         try {
             if (theOnlyOne == null) {
@@ -41,6 +47,14 @@ public abstract class TheTerminal {
 
     public static int width() {
         int width = get().getWidth();
+        if (width < 0) {
+            return 0;
+        }
+        return width;
+    }
+
+    public static int height() {
+        int width = get().getHeight();
         if (width < 0) {
             return 0;
         }

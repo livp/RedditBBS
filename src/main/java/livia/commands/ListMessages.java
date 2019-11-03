@@ -4,10 +4,9 @@ import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.json.GenericJson;
+import com.google.api.client.util.ArrayMap;
 import com.google.common.base.Strings;
-import livia.Model;
-import livia.Model.Listing;
-import livia.Model.Subreddit;
+import livia.Model.*;
 import livia.singletons.Network;
 import livia.singletons.TheTerminal;
 import org.jline.reader.LineReader;
@@ -19,18 +18,22 @@ import org.jline.utils.AttributedStringBuilder;
 import org.jline.utils.AttributedStyle;
 
 import java.io.IOException;
+import java.util.Map;
 
 import static livia.Banners.BUM;
+import static livia.Banners.ErrorType.BUM;
 import static livia.Banners.OH_FUCK;
 import static livia.singletons.TheTerminal.flush;
 import static livia.singletons.TheTerminal.writer;
 
-public class ListPosts extends Command {
+public class ListMessages extends Command {
 
+    private static final String IS_NUMERIC_REGEX = "-?\\d+(\\.\\d+)?";
     private final Subreddit subreddit;
     private final PostSort postSort;
     private final Command parent;
     private Listing listing = null;
+    private Map<Integer, Message> messages = new ArrayMap<>();
 
     public enum PostSort {
         HOT,
@@ -40,12 +43,12 @@ public class ListPosts extends Command {
     }
 
     public static Command create(Subreddit subreddit, PostSort postSort, Command parent) {
-        ListPosts command = new ListPosts(subreddit, postSort, parent);
+        ListMessages command = new ListMessages(subreddit, postSort, parent);
         command.runQuery();
         return command;
     }
 
-    private ListPosts(Subreddit subreddit, PostSort postSort, Command parent) {
+    private ListMessages(Subreddit subreddit, PostSort postSort, Command parent) {
         super();
         this.subreddit = subreddit;
         this.postSort = postSort;
@@ -67,9 +70,15 @@ public class ListPosts extends Command {
 
         boolean end = false;
 
-//        if (subreddits.containsKey(command)) {
-//            return Command.subreddit(subreddits.get(command));
-//        }
+        if (command.matches(IS_NUMERIC_REGEX)) {
+            // A post
+            int number = Integer.valueOf(command);
+            if (!messages.containsKey(number)) {
+                BUM("BAD MESSAGE NUMBER");
+                return this;
+            }
+            return Command.message(messages.get(number), this);
+        }
 
         switch (command.toUpperCase()) {
             case "BACK":
@@ -121,10 +130,14 @@ public class ListPosts extends Command {
             HttpRequest request = Network.request(url);
             HttpResponse httpResponse = request.execute();
             GenericJson jsonResponse = httpResponse.parseAs(GenericJson.class);
-            listing = Model.Listing.fromJson(jsonResponse);
+            listing = Listing.fromJson(jsonResponse);
 
-            for (Model.Message message : listing.messages) {
+            for (Message message : listing.messages) {
+                int messageNumber = messages.size() /* 0 based, no need for +1 */;
+                messages.put(messageNumber, message);
                 AttributedString fancyTitle = new AttributedStringBuilder()
+                        .style(AttributedStyle.DEFAULT.foreground(AttributedStyle.CYAN))
+                        .append(String.format("[%d]", messageNumber))
                         .style(AttributedStyle.DEFAULT.foreground(AttributedStyle.BLUE))
                         .append("*** ")
                         .style(AttributedStyle.DEFAULT.foreground(AttributedStyle.WHITE))
@@ -134,15 +147,9 @@ public class ListPosts extends Command {
                         .toAttributedString();
                 writer().println(fancyTitle.toAnsi());
                 flush();
-//            }
-//
-//            listing.subreddits.forEach(
-//                    subreddit -> subreddits.put(subreddit.displayName, subreddit)
-//            );
-//
-                if (Strings.isNullOrEmpty(listing.after)) {
-                    listing = null;
-                }
+            }
+            if (Strings.isNullOrEmpty(listing.after)) {
+                listing = null;
             }
         } catch (IOException e) {
             e.printStackTrace();

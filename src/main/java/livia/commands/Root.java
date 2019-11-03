@@ -1,5 +1,6 @@
 package livia.commands;
 
+import livia.Model.*;
 import livia.singletons.TheTerminal;
 import org.jline.reader.Completer;
 import org.jline.reader.LineReader;
@@ -9,6 +10,9 @@ import org.jline.reader.impl.DefaultParser;
 import org.jline.utils.AttributedStringBuilder;
 import org.jline.utils.AttributedStyle;
 
+import java.io.IOException;
+
+import static livia.Banners.BIG_BADA_BUM;
 import static livia.Banners.BUM;
 import static livia.singletons.TheTerminal.flush;
 
@@ -35,11 +39,24 @@ public class Root extends Command {
                 break;
             case "LIST":
                 if (parsedLine.words().size() != 2) {
-                    BUM("list <filter>");
+                    BUM("LIST <FILTER>");
                     break;
                 }
                 String filter = parsedLine.words().get(1);
                 return Command.listSubreddits(filter);
+            case "SUB":
+                if (parsedLine.words().size() != 2) {
+                    BUM("SUB <NAME>");
+                    break;
+                }
+                String subredditName = parsedLine.words().get(1);
+                try {
+                    Subreddit subreddit = Subreddit.fetch(subredditName);
+                    return Command.subreddit(subreddit, this);
+                } catch (IOException e) {
+                    BIG_BADA_BUM("BAD SUBREDDIT NAME OR NETWORK ERROR");
+                }
+                break;
             default:
                 BUM("Valid commands: LIST, END");
         }

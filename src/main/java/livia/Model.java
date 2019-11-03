@@ -1,22 +1,16 @@
 package livia;
 
+import com.google.api.client.http.GenericUrl;
+import com.google.api.client.http.HttpRequest;
+import com.google.api.client.http.HttpResponse;
 import com.google.api.client.json.GenericJson;
 import com.google.api.client.util.ArrayMap;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
-import io.korhner.asciimg.image.AsciiImgCache;
-import io.korhner.asciimg.image.character_fit_strategy.ColorSquareErrorFitStrategy;
-import io.korhner.asciimg.image.converter.AsciiToStringConverter;
+import livia.singletons.Network;
+import livia.singletons.TheTerminal;
 
-import javax.imageio.ImageIO;
-import java.awt.*;
-import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class Model {
 
@@ -33,8 +27,9 @@ public class Model {
 
             ArrayMap data = (ArrayMap) json.get("data");
             ArrayList<ArrayMap> children = (ArrayList<ArrayMap>) data.get("children");
-            parseChildren(listing, children);
             listing.after = stringOrEmpty(data, "after");
+
+            parseChildren(listing, children);
 
             return listing;
         }
@@ -42,42 +37,44 @@ public class Model {
         private static void parseChildren(Listing listing, ArrayList<ArrayMap> children) {
             children.forEach(child -> {
                 String kind = stringOrEmpty(child, "kind");
-              ArrayMap data = (ArrayMap) child.get("data");
-                    switch (kind){
-                      case "t5":
-                        listing.subreddits.add(Subreddit.fromJson(data));
+                ArrayMap data = (ArrayMap) child.get("data");
+                switch (kind) {
+                    case "t5":
+                        listing.subreddits.add(Subreddit.fromListing(data));
                         break;
-                      case "t4":
+                    case "t3":
                         listing.messages.add(Message.fromJson(data));
                         break;
-                    }
+                }
             });
         }
 
     }
 
     public static class Subreddit {
-
-        private static final AsciiImgCache cache = AsciiImgCache.create(
-                new Font("Courier", Font.BOLD, 6));
-
-        private static final AsciiToStringConverter stringConverter =
-                new AsciiToStringConverter(cache, new ColorSquareErrorFitStrategy());
-
         public String displayName;
         public String description;
         public String icon;
 
-        public static Subreddit fromJson(ArrayMap json) {
+        public static Subreddit fetch(String name) throws IOException {
+            GenericUrl url = new GenericUrl(String.format("https://www.reddit.com/r/%s/about.json", name));
+            HttpRequest request = Network.request(url);
+            HttpResponse httpResponse = request.execute();
+            GenericJson jsonResponse = httpResponse.parseAs(GenericJson.class);
+            ArrayMap map = (ArrayMap) jsonResponse.get("data");
+            return fromListing(map);
+        }
+
+        public static Subreddit fromListing(ArrayMap json) {
             Subreddit subreddit = new Subreddit();
 
             subreddit.displayName = stringOrEmpty(json, "display_name");
             subreddit.description = stringOrEmpty(json, "description");
-            BufferedImage image = imageOrNull(json, "icon_img");
+            ASCIImage image = ASCIImage.create(json, "icon_img");
             if (image != null) {
-                BufferedImage largeImage = resizeImage(image, 256, 256);
-                subreddit.icon = stringConverter.convertImage(largeImage).toString();
+                subreddit.icon = image.resizeImage(200, 200);
             }
+
             return subreddit;
         }
 
@@ -100,17 +97,49 @@ public class Model {
     }
 
     public static class Message {
-      public String title;
+        public String title;
+        public List<String> urls = new ArrayList<>();
+        public List<String> images = new ArrayList<>();
 
-      public static Message fromJson(ArrayMap json) {
-        Message message = new Message();
+        public static Message fromJson(ArrayMap json) {
+            Message message = new Message();
+            message.title = stringOrEmpty(json, "title");
 
-        message.title = stringOrEmpty(json, "title");
+            // This needs a fluid construct.
+            if (json.containsKey("preview")) {
+                ArrayMap preview = (ArrayMap) json.get("preview");
+                if (preview.containsKey("images")) {
+                    ArrayList<ArrayMap> previewImages = (ArrayList<ArrayMap>) preview.get("images");
+                    for (ArrayMap image : previewImages) {
+                        if (image.containsKey("source")) {
+                            ArrayMap source = (ArrayMap) image.get("source");
+                            if (source.containsKey("url")) {
+                                String url = (String) source.get("url");
+                                url = url.replace("amp;", "");
+                                message.urls.add(url);
+                            }
+                        }
+                    }
+                }
+            }
         return message;
-      }
+        }
+
+        public String asciiImage() {
+            String url = urls.get(urls.size() - 1); // The last image is the smallest
+            ASCIImage image = ASCIImage.create(url);
+            double factor = 2;
+            double width = TheTerminal.width() * factor;
+            if (width == 0) {
+                width = 250.0;
+            }
+            double ratio = width /  (double)image.width();
+            double height = ratio * (double)image.height();
+            return image.resizeImage((int)Math.round(width), (int)Math.round(height));
+        }
     }
 
-    static String stringOrEmpty(ArrayMap json, String key) {
+    public static String stringOrEmpty(ArrayMap json, String key) {
         if (!json.containsKey(key)) {
             return "";
         }
@@ -119,33 +148,5 @@ public class Model {
             return (String) value;
         }
         return "";
-    }
-
-    static BufferedImage imageOrNull(ArrayMap json, String key) {
-        if (!json.containsKey(key)) {
-            return null;
-        }
-        Object value = json.get(key);
-        if (value instanceof String) {
-            String url = (String) value;
-            if (Strings.isNullOrEmpty(url)) {
-                return null;
-            }
-            try {
-                return ImageIO.read(new URL(url));
-            } catch (IOException _ignored) {
-                return null;
-            }
-        }
-        return null;
-    }
-
-    static BufferedImage resizeImage(BufferedImage img, int height, int width) {
-        Image tmp = img.getScaledInstance(width, height, Image.SCALE_SMOOTH);
-        BufferedImage resized = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2d = resized.createGraphics();
-        g2d.drawImage(tmp, 0, 0, null);
-        g2d.dispose();
-        return resized;
     }
 }

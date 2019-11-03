@@ -9,5 +9,8 @@
         <module name="RedditBBS" />
       </profile>
     </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="RedditBBS" target="11" />
+    </bytecodeTargetLevel>
   </component>
 </project>

@@ -61,7 +61,7 @@ public class ListSubreddits extends Command {
         boolean end = false;
 
         if (subreddits.containsKey(command)) {
-            return Command.subreddit(subreddits.get(command));
+            return Command.subreddit(subreddits.get(command), this);
         }
 
         switch (command.toUpperCase()) {

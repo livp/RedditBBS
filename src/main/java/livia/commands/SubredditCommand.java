@@ -1,8 +1,8 @@
 package livia.commands;
 
 import com.google.common.base.Strings;
-import livia.Model.Subreddit;
-import livia.commands.ListMessages.PostSort;
+import livia.Model.*;
+import livia.commands.ListMessagesCommand.PostSort;
 import livia.singletons.TheTerminal;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;

@@ -6,6 +6,8 @@ import com.google.api.client.http.HttpResponse;
 import com.google.api.client.json.GenericJson;
 import com.google.api.client.util.ArrayMap;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import livia.commands.Command;
 import livia.singletons.Network;
 import livia.singletons.TheTerminal;
 
@@ -51,10 +53,18 @@ public class Model {
 
     }
 
-    public static class Subreddit {
+    public interface SubOrMulti {
+        String name();
+    }
+
+    public static class Subreddit implements SubOrMulti {
         public String displayName;
         public String description;
         public String icon;
+
+        public String name() {
+            return displayName;
+        }
 
         public static Subreddit fetch(String name) throws IOException {
             GenericUrl url = new GenericUrl(String.format("https://www.reddit.com/r/%s/about.json", name));
@@ -96,14 +106,38 @@ public class Model {
         }
     }
 
+    public static class Multi implements SubOrMulti {
+
+        private final String name;
+
+        public String name() {
+            return name;
+        }
+
+        public static Multi of(String name) throws IOException {
+            return new Multi(name);
+        }
+
+        private Multi(String name) {
+            this.name = name;
+        }
+    }
+
     public static class Message {
-        public String title;
-        public List<String> urls = new ArrayList<>();
-        public List<String> images = new ArrayList<>();
+        public final String id;
+        public final String subreditName;
+        public final String title;
+        public final String body;
+        public final String url;
+        public final List<String> images = new ArrayList<>();
 
         public static Message fromJson(ArrayMap json) {
-            Message message = new Message();
-            message.title = stringOrEmpty(json, "title");
+            Message message = new Message(
+                    stringOrEmpty(json, "id"),
+                    stringOrEmpty(json, "subreddit"),
+                    stringOrEmpty(json, "title"),
+                    stringOrEmpty(json, "selftext"),
+                    stringOrEmpty(json, "url"));
 
             // This needs a fluid construct.
             if (json.containsKey("preview")) {
@@ -116,26 +150,53 @@ public class Model {
                             if (source.containsKey("url")) {
                                 String url = (String) source.get("url");
                                 url = url.replace("amp;", "");
-                                message.urls.add(url);
+                                message.images.add(url);
                             }
                         }
                     }
                 }
             }
-        return message;
+            return message;
+        }
+
+        private Message(String id, String subreditName, String title, String body, String url) {
+            this.id = id;
+            this.subreditName = subreditName;
+            this.body = body;
+            this.title = title;
+            this.url = url;
         }
 
         public String asciiImage() {
-            String url = urls.get(urls.size() - 1); // The last image is the smallest
+            String url = images.get(images.size() - 1); // The last image is the smallest
             ASCIImage image = ASCIImage.create(url);
             double factor = 2;
             double width = TheTerminal.width() * factor;
             if (width == 0) {
                 width = 250.0;
             }
-            double ratio = width /  (double)image.width();
-            double height = ratio * (double)image.height();
-            return image.resizeImage((int)Math.round(width), (int)Math.round(height));
+            double ratio = width / (double) image.width();
+            double height = ratio * (double) image.height();
+            return image.resizeImage((int) Math.round(width), (int) Math.round(height));
+        }
+    }
+
+    public static class Comment {
+
+        public final String author;
+        public final String body;
+        // TODO: children
+
+        public static Comment fromJson(ArrayMap json) {
+            Comment comment = new Comment(
+                    stringOrEmpty(json, "author"),
+                    stringOrEmpty(json, "body"));
+            return comment;
+        }
+
+        private Comment(String author, String body) {
+            this.author = author;
+            this.body = body;
         }
     }
 

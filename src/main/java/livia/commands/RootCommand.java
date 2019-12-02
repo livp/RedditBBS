@@ -1,8 +1,8 @@
 package livia.commands;
 
 import livia.Model.*;
+import livia.commands.ListMessagesCommand.PostSort;
 import livia.singletons.TheTerminal;
-import org.jline.reader.Completer;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.ParsedLine;
@@ -16,10 +16,10 @@ import static livia.Banners.BIG_BADA_BUM;
 import static livia.Banners.BUM;
 import static livia.singletons.TheTerminal.flush;
 
-public class Root extends Command {
+public class RootCommand extends Command {
 
-    public static Root create() {
-        return new Root();
+    public static RootCommand create() {
+        return new RootCommand();
     }
 
     @Override
@@ -57,8 +57,21 @@ public class Root extends Command {
                     BIG_BADA_BUM("BAD SUBREDDIT NAME OR NETWORK ERROR");
                 }
                 break;
+            case "MULTI":
+                if (parsedLine.words().size() != 2) {
+                    BUM("MULTI <NAME>");
+                    break;
+                }
+                String multiName = parsedLine.words().get(1);
+                try {
+                    Multi multi = Multi.of(multiName);
+                    return Command.listPosts(multi, PostSort.HOT, this);
+                } catch (IOException e) {
+                    BIG_BADA_BUM("BAD SUBREDDIT NAME OR NETWORK ERROR");
+                }
+                break;
             default:
-                BUM("Valid commands: LIST, END");
+                BUM("Valid commands: LIST, SUB, MULTI, END");
         }
         flush();
 

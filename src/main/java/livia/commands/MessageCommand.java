@@ -1,25 +1,34 @@
 package livia.commands;
 
+import com.google.api.client.http.GenericUrl;
+import com.google.api.client.http.HttpRequest;
+import com.google.api.client.http.HttpResponse;
+import com.google.api.client.json.GenericJson;
+import com.google.api.client.util.ArrayMap;
 import com.google.common.base.Strings;
 import livia.Model.*;
+import livia.singletons.Network;
 import livia.singletons.TheTerminal;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.ParsedLine;
 import org.jline.reader.impl.DefaultParser;
-import org.jline.reader.impl.completer.StringsCompleter;
-import org.jline.terminal.Terminal;
 import org.jline.utils.AttributedStringBuilder;
 import org.jline.utils.AttributedStyle;
 
-import static livia.Banners.BUM;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import static livia.Banners.*;
 import static livia.singletons.TheTerminal.flush;
 
 public class MessageCommand extends Command {
 
+    private static final int MAX_TITLE_LENGTH = 70;
+
     private final Message message;
     private final Command parent;
-    private boolean firstTime = true;
 
     private MessageCommand(Message message, Command parent) {
         this.message = message;
@@ -27,15 +36,35 @@ public class MessageCommand extends Command {
     }
 
     public static Command create(Message message, Command parent) {
-        if (!message.urls.isEmpty()) {
+        if (!Strings.isNullOrEmpty(message.title)) {
+            String boldTitle = new AttributedStringBuilder()
+                    .style(AttributedStyle.DEFAULT.foreground(AttributedStyle.WHITE).bold())
+                    .append(message.title)
+                    .toAnsi();
+            TheTerminal.println(boldTitle);
+        }
+        if (!message.images.isEmpty()) {
             String image = message.asciiImage();
             String fancyImage = new AttributedStringBuilder()
-                    .style(AttributedStyle.DEFAULT.foreground(AttributedStyle.WHITE).bold())
+                    .style(AttributedStyle.DEFAULT.foreground(AttributedStyle.WHITE))
                     .append(image)
                     .toAnsi();
             TheTerminal.println(fancyImage);
         }
-        // TODO: Content
+        if (!Strings.isNullOrEmpty(message.body)) {
+            TheTerminal.println(message.body);
+        }
+        if (!Strings.isNullOrEmpty(message.url)) {
+            String url = new AttributedStringBuilder()
+                    .style(AttributedStyle.DEFAULT.foreground(AttributedStyle.BLUE))
+                    .append("URL[")
+                    .style(AttributedStyle.DEFAULT.foreground(AttributedStyle.WHITE).bold())
+                    .append(message.url)
+                    .style(AttributedStyle.DEFAULT.foreground(AttributedStyle.BLUE))
+                    .append("]")
+                    .toAnsi();
+            TheTerminal.println(url);
+        }
         return new MessageCommand(message, parent);
     }
 
@@ -56,8 +85,39 @@ public class MessageCommand extends Command {
             case "END":
                 end = true;
                 break;
+            case "GO":
+                try {
+                    Process browser = new ProcessBuilder(
+                            "x-terminal-emulator",
+                            "-e",
+                            "/usr/bin/lynx",
+                            message.url).start();
+                } catch (IOException e) {
+                    BUM("I can't start lynx. No URL for you.");
+                }
+                break;
+            case "THUMBNAIL":
+            case "THUMB":
+            case "IMAGE":
+            case "IMG":
+                if (!message.images.isEmpty()) {
+                    String image = message.asciiImage();
+                    String fancyImage = new AttributedStringBuilder()
+                            .style(AttributedStyle.DEFAULT.foreground(AttributedStyle.WHITE))
+                            .append(image)
+                            .toAnsi();
+                    TheTerminal.println(fancyImage);
+                } else {
+                    String noImage = new AttributedStringBuilder()
+                            .style(AttributedStyle.DEFAULT.foreground(AttributedStyle.WHITE))
+                            .append("No thumbnail available, sorry.")
+                            .toAnsi();
+                    TheTerminal.println(noImage);
+                }
+            case "COMMENTS":
+                return ListComments.create(message);
             default:
-                BUM("Valid commands: BACK, END");
+                BUM("Valid commands: BACK, END, GO, THUMB[NAIL], IMG, COMMENTS");
         }
         flush();
 
@@ -71,19 +131,17 @@ public class MessageCommand extends Command {
     private String prompt() {
         AttributedStringBuilder builder = new AttributedStringBuilder()
                 .style(AttributedStyle.DEFAULT.foreground(AttributedStyle.BLUE));
-
-        // TODO the parent
         String title = message.title;
-        if (title.length() > 10) {
-            title = title.substring(0, 10);
-        }
-        if (!message.images.isEmpty()) {
-            builder.append(message.images.get(0));
+        if (title.length() > MAX_TITLE_LENGTH) {
+            title = title.substring(0, MAX_TITLE_LENGTH);
         }
         builder.append(String.format("> %s > ", title));
         String prompt = builder.style(AttributedStyle.DEFAULT.foreground(AttributedStyle.WHITE))
                 .toAnsi();
         return prompt;
+    }
+
+    private void comments() {
     }
 
 }

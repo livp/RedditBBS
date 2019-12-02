@@ -125,7 +125,6 @@ public class Banners {
     }
   }
 
-
   // Prevent instantiation.
   private Banners() {}
 
